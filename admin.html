@@ -72,7 +72,7 @@ dialog::backdrop{background:rgba(0,0,0,.4)}
 <section id="gate">
  <h1>Organizer</h1>
  <p class="muted">CSA formal matches. Enter the organizer password.</p>
- <form id="gf"><input id="pw" type="password" autocomplete="current-password" placeholder="Organizer password" required>
+ <form id="gf"><input id="pw" type="password" autocomplete="current-password" autocapitalize="none" autocorrect="off" spellcheck="false" placeholder="Organizer password" required>
   <p class="err" id="gerr"></p><button class="primary" type="submit" id="gbtn" style="width:100%">Unlock</button></form>
 </section>
 
@@ -90,7 +90,7 @@ dialog::backdrop{background:rgba(0,0,0,.4)}
    <button id="addp" type="button">Add person</button>
    <button id="more" type="button">Settings &amp; export</button>
   </div>
-  <div id="selbar"><span id="seltext"></span><button id="unmatch" type="button">Unmatch</button><button id="selx" type="button">Cancel</button></div>
+  <div id="selbar"><span id="seltext"></span><button id="automatch" type="button">Auto-match</button><button id="unmatch" type="button">Unmatch</button><button id="selx" type="button">Cancel</button></div>
  </div></div>
  <main class="wrap">
   <p class="stats" id="stats"></p>
@@ -120,7 +120,7 @@ dialog::backdrop{background:rgba(0,0,0,.4)}
 
 <dialog id="dadd">
  <h2 style="margin-top:0">Add a person</h2>
- <p class="small muted">They'll start unmatched. They sign in with their first name + the last 4 digits of this phone number.</p>
+ <p class="small muted">If no one compatible is free, they'll go in the unmatched list. They sign in with their first name + the last 4 digits of this phone number.</p>
  <form class="form" id="addf">
   <label>First name<input name="first" required></label>
   <label>Last name<input name="last" required></label>
@@ -130,6 +130,8 @@ dialog::backdrop{background:rgba(0,0,0,.4)}
   <label>Year<select name="year"><option></option><option>Freshman</option><option>Sophomore</option><option>Junior</option><option>Senior</option><option>Grad/other</option></select></label>
   <label>Identifies as<select name="gender"><option>Female</option><option>Male</option><option value="">Other / not given</option></select></label>
   <label>Wants<select name="want"><option>Male</option><option>Female</option><option>No preference</option></select></label>
+  <label>School preference<select name="sp"><option>No preference</option><option>Same</option><option>Different</option></select></label>
+  <label class="full chk" style="display:flex;font-weight:600"><input type="checkbox" name="auto" checked> Match them with someone who's still free</label>
   <div class="actions full"><button type="button" id="addx">Cancel</button><button class="primary" type="submit">Add</button></div>
  </form>
 </dialog>
@@ -163,11 +165,11 @@ $('#gf').addEventListener('submit',async e=>{
   e.preventDefault();$('#gerr').textContent='';$('#gbtn').disabled=true;$('#gbtn').textContent='Unlocking…';
   try{
     const a=await (await fetch('admin.json?v='+Date.now(),{cache:'no-store'})).json();
-    ASALT=b64d(a.salt);AITER=a.iter;AKEY=await pwKey($('#pw').value,ASALT,AITER);
+    ASALT=b64d(a.salt);AITER=a.iter;AKEY=await pwKey($('#pw').value.trim().toLowerCase().replace(/[\u2010-\u2015\u2212\s]+/g,'-'),ASALT,AITER);
     const raw=b64d(a.data);
     S=JSON.parse(dec.decode(await crypto.subtle.decrypt({name:'AES-GCM',iv:raw.slice(0,12)},AKEY,raw.slice(12))));
     PM=P();$('#gate').style.display='none';$('#app').style.display='block';render();
-  }catch(err){$('#gerr').textContent=err.name==='OperationError'?'Wrong password.':"Couldn't load admin.json ("+err.message+')'}
+  }catch(err){$('#gerr').textContent=err.name==='OperationError'?'Wrong password.':"Couldn't load admin.json. Check it's uploaded next to admin.html ("+err.message+')'}
   finally{$('#gbtn').disabled=false;$('#gbtn').textContent='Unlock'}
 });
 
@@ -213,8 +215,8 @@ function render(){
   const sp=sel&&PM.get(sel);
   $('#selbar').classList.toggle('on',!!sp);
   if(sp){const alone=S.rounds[0][gOf(sel)].ids.length===1;
-    $('#seltext').textContent=alone?`${sp.name} selected. Tap someone matched to swap them in, or another unmatched person to pair them.`:`${sp.name} selected. Tap someone to swap them, or Unmatch.`;
-    $('#unmatch').style.display=alone?'none':''}
+    $('#seltext').textContent=alone?`${sp.name} selected. Auto-match them, tap someone matched to swap them in, or tap another unmatched person to pair them.`:`${sp.name} selected. Tap someone to swap them, or Unmatch.`;
+    $('#unmatch').style.display=alone?'none':'';$('#automatch').style.display=alone?'':'none'}
   $('#undo').disabled=!hist.length;$('#publish').disabled=!dirty;
   $('#status').textContent=dirty?'Unpublished changes':'All changes published';
 }
@@ -243,6 +245,43 @@ $('#undo').addEventListener('click',()=>{const h=hist.pop();if(!h)return;const o
 $('#q').addEventListener('input',render);$('#onlybad').addEventListener('change',render);
 addEventListener('beforeunload',e=>{if(dirty){e.preventDefault();e.returnValue=''}});
 
+/* ---------- auto-match ---------- */
+const NO_AUTO=new Set(['p157']); // Emily Zhang asked for platonic only
+const YR={Freshman:1,Sophomore:2,Junior:3,Senior:4,'Grad/other':5};
+function schoolNorm(s){s=String(s||'').toLowerCase();
+  for(const [a,b] of [['barnard','Columbia'],['columbia','Columbia'],['upenn','UPenn'],['penn','UPenn'],['nyu','NYU'],['new york university','NYU'],['princeton','Princeton'],['cornell','Cornell'],
+    ['brown','Brown'],['virginia','UVA'],['wpi','WPI'],['worcester','WPI'],['rutgers','Rutgers'],['stanford','Stanford'],['boston','BU'],['nyit','NYIT'],['cooper','Cooper'],['harvard','Harvard']])if(s.includes(a))return b;
+  return s||'?'}
+const wants=(x,y)=>!x.want||x.want==='No preference'?true:x.want===y.gender;
+function fit(a,b){
+  if(!wants(a,b)||!wants(b,a))return null;
+  let s=0;
+  for(const [x,y] of [[a,b],[b,a]]){const same=x.sch!=='?'&&x.sch===y.sch;
+    if(x.sp==='Same'&&!same)s-=40;if(x.sp==='Different'&&same)s-=40}
+  if(YR[a.year]&&YR[b.year])s-=4*Math.abs(YR[a.year]-YR[b.year]);
+  s+=6*inter(a.ms,b.ms).length+3*inter(a.ht,b.ht).length+2*inter(a.st,b.st).length+1.5*inter(a.wt,b.wt).length;
+  return s+Math.random()*0.5;
+}
+function bestFree(p){
+  let best=null,bs=-Infinity;
+  for(const g of S.rounds[0]){
+    if(g.ids.length!==1||g.ids[0]===p.id||NO_AUTO.has(g.ids[0]))continue;
+    const c=PM.get(g.ids[0]),f=fit(p,c);
+    if(f!==null&&f>bs){bs=f;best=c}
+  }
+  return best;
+}
+function autoMatch(p){
+  const c=bestFree(p);if(!c)return null;
+  detach(p.id);const g=S.rounds[0][gOf(c.id)];g.ids.push(p.id);g.ids.sort((x,y)=>PM.get(x).name.localeCompare(PM.get(y).name));
+  return c;
+}
+$('#automatch').addEventListener('click',()=>{
+  if(!sel)return;const p=PM.get(sel);snap();const c=autoMatch(p);
+  if(!c){hist.pop();toast(`No one compatible with ${p.name} is free right now.`,5000);return}
+  sel=null;$('#q').value=p.first;changed();toast(`Matched ${p.name} with ${c.name}. Hit Publish to make it live.`,6000);
+});
+
 /* ---------- add person ---------- */
 const NICK=[['will','william'],['ben','benjamin'],['alex','alexander'],['matt','matthew'],['dan','daniel'],['nick','nicholas'],['chris','christopher'],['jon','jonathan'],['josh','joshua'],['andy','andrew'],['tony','anthony'],['kate','katherine'],['liz','elizabeth'],['abby','abigail'],['jess','jessica'],['steph','stephanie'],['vicky','victoria'],['mike','michael'],['jake','jacob'],['zach','zachary'],['max','maxwell'],['cathy','catherine'],['sam','samuel'],['sam','samantha']];
 const norm=s=>String(s||'').toLowerCase().replace(/[^a-z]/g,'');
@@ -263,10 +302,13 @@ $('#addf').addEventListener('submit',async e=>{
     if(taken.has(id)){toast(`Someone named ${f.first} already uses ${l4}. Use a different number.`);return}
     logins.push([id,hexe(b.slice(16))])}
   snap();
-  const p={id:'n'+Date.now(),name:`${f.first.trim()} ${f.last.trim()}`,first:f.first.trim(),school:f.school.trim(),year:f.year,gender:f.gender,want:f.want,sp:'',sch:f.school.trim()||'?',
+  const p={id:'n'+Date.now(),name:`${f.first.trim()} ${f.last.trim()}`,first:f.first.trim(),school:f.school.trim(),year:f.year,gender:f.gender,want:f.want,sp:f.sp||'',sch:schoolNorm(f.school),
     phone:dg.length===10?`(${dg.slice(0,3)}) ${dg.slice(3,6)}-${dg.slice(6)}`:f.phone,ig:f.ig.replace(/^@/,'').trim(),study:'',pers:'',aes:'',hobbies:'',music:'',ms:[],ht:[],st:[],wt:[],logins,codes:[l4]};
   S.people.push(p);PM=P();S.rounds.forEach(rd=>rd.push({type:'match',ids:[p.id]}));
-  $('#dadd').close();$('#q').value='';sel=p.id;changed();toast(`Added ${p.name}. They're in the unmatched list and selected: tap someone to pair them.`,6000);
+  $('#dadd').close();
+  const c=f.auto?autoMatch(p):null;
+  if(c){sel=null;$('#q').value=p.first;changed();toast(`Added ${p.name} and matched them with ${c.name}. Hit Publish to make it live.`,7000)}
+  else{$('#q').value='';sel=p.id;changed();toast(f.auto?`Added ${p.name}, but no one compatible is free right now. They're in the unmatched list.`:`Added ${p.name}. They're selected: tap someone to pair them.`,7000)}
 });
 
 /* ---------- build + publish ---------- */
