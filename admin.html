@@ -1,0 +1,354 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex">
+<title>Organizer · CSA Matches</title>
+<style>
+/* VOICE: a working tool for a busy night: calm, dense, fast to scan.
+   IDEA: the seating chart at the check-in table; each row is a table of two.
+   PICTURE: the list of pairs itself, then the unmatched list.
+   COLOUR and TYPE: ivory ground, lacquer red for actions, gold for selection; system sans.
+   LAYOUT: sticky toolbar, then one column of pair rows; chips wrap on phones. */
+:root{color-scheme:light dark;--bg:light-dark(#fbf7f0,#16100e);--card:light-dark(#fff,#211816);--ink:light-dark(#2a1512,#f4ebe0);
+ --muted:light-dark(#7a5f57,#bba49a);--line:light-dark(#eadfce,#382a25);--red:#b3121f;--redsoft:light-dark(#fbe3e3,#4a1a1a);
+ --gold:light-dark(#f6ead0,#3a2e17);--goldink:light-dark(#6d4d0c,#f1d18a);--warn:light-dark(#9a5a00,#f1c27a);--sel:light-dark(#ffe9a8,#5b4710)}
+:root[data-theme=light]{color-scheme:light}:root[data-theme=dark]{color-scheme:dark}
+*{box-sizing:border-box;min-width:0}
+body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.45 system-ui,-apple-system,"Segoe UI",sans-serif}
+button,input,select{font:inherit;color:inherit}
+button{min-height:40px;padding:0 14px;border-radius:9px;border:1px solid var(--line);background:var(--card);cursor:pointer;font-weight:600}
+button.primary{background:var(--red);border-color:var(--red);color:#fff}
+button:disabled{opacity:.45;cursor:default}
+input,select{min-height:42px;padding:8px 12px;border-radius:9px;border:1px solid var(--line);background:var(--card);font-size:16px;width:100%}
+:focus-visible{outline:3px solid #d9a63a;outline-offset:2px}
+.wrap{max-width:1000px;margin:0 auto;padding:0 16px}
+#gate{max-width:420px;margin:12vh auto;padding:0 20px}
+h1{font:600 30px/1.1 Georgia,serif;margin:0 0 8px}
+.muted{color:var(--muted)}.small{font-size:13px}
+.err{color:var(--red);min-height:1.4em;font-size:14px}
+#app{display:none}
+.bar{position:sticky;top:0;z-index:5;background:color-mix(in srgb,var(--bg) 92%,transparent);backdrop-filter:blur(8px);border-bottom:1px solid var(--line);padding:10px 0}
+.row1,.row2{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+.row2{margin-top:8px}
+.row1 h1{font-size:22px;margin:0;flex:1 1 auto}
+#q{flex:1 1 220px;width:auto}
+.chk{display:flex;gap:6px;align-items:center;font-size:14px;white-space:nowrap}
+.chk input{width:18px;min-height:18px}
+#status{font-size:13px}
+#selbar{display:none;margin-top:8px;padding:8px 12px;border-radius:10px;background:var(--sel);gap:8px;align-items:center;flex-wrap:wrap}
+#selbar.on{display:flex}
+#selbar span{flex:1 1 200px}
+.stats{margin:14px 0 8px;font-size:14px;color:var(--muted)}
+.list{display:grid;gap:8px;padding-bottom:80px}
+.grp{display:grid;grid-template-columns:auto minmax(0,1fr) auto;gap:10px;align-items:center;background:var(--card);border:1px solid var(--line);border-radius:12px;padding:10px}
+.grp.bad{border-color:var(--warn)}
+.type{min-width:78px;font-size:13px}
+.chips{display:flex;flex-wrap:wrap;gap:6px}
+.chip{display:flex;flex-direction:column;align-items:flex-start;text-align:left;min-height:44px;padding:5px 10px;border-radius:9px;background:var(--bg);font-weight:600}
+.chip small{font-weight:400;color:var(--muted);font-size:12px}
+.chip.sel{background:var(--sel);border-color:#d9a63a}
+.chip.hit{box-shadow:inset 0 0 0 2px var(--red)}
+.unmh{margin:26px 0 8px;font-size:16px}
+.unm{display:flex;flex-wrap:wrap;gap:6px;padding-bottom:80px}
+.grp{grid-template-columns:minmax(0,1fr) auto}
+.warns{grid-column:1/-1;font-size:13px;color:var(--warn)}
+.warns:empty{display:none}
+.side{display:flex;gap:6px}
+dialog{border:1px solid var(--line);border-radius:14px;background:var(--card);color:var(--ink);max-width:520px;width:calc(100% - 32px);padding:20px}
+dialog::backdrop{background:rgba(0,0,0,.4)}
+.form{display:grid;gap:10px;grid-template-columns:minmax(0,1fr) minmax(0,1fr)}
+.form label{display:grid;gap:4px;font-size:13px;font-weight:600}
+.form .full{grid-column:1/-1}
+.actions{display:flex;gap:8px;justify-content:flex-end;margin-top:14px;flex-wrap:wrap}
+#toast{position:fixed;left:50%;bottom:18px;transform:translateX(-50%);background:var(--ink);color:var(--bg);padding:10px 16px;border-radius:10px;font-size:14px;display:none;max-width:90vw;z-index:9}
+@media(max-width:600px){.bar{position:static}#selbar.on{position:fixed;left:8px;right:8px;bottom:8px;z-index:6;box-shadow:0 8px 24px rgba(0,0,0,.25)}
+ .grp{grid-template-columns:minmax(0,1fr)}.warns{grid-column:1}.side{justify-content:flex-end}.type{justify-self:start}}
+</style>
+</head>
+<body>
+
+<section id="gate">
+ <h1>Organizer</h1>
+ <p class="muted">CSA formal matches. Enter the organizer password.</p>
+ <form id="gf"><input id="pw" type="password" autocomplete="current-password" placeholder="Organizer password" required>
+  <p class="err" id="gerr"></p><button class="primary" type="submit" id="gbtn" style="width:100%">Unlock</button></form>
+</section>
+
+<section id="app">
+ <div class="bar"><div class="wrap">
+  <div class="row1">
+   <h1>Matches</h1>
+   <span id="status" class="muted">All changes published</span>
+   <button id="undo" type="button" disabled>Undo</button>
+   <button id="publish" class="primary" type="button" disabled>Publish</button>
+  </div>
+  <div class="row2">
+   <input id="q" type="search" placeholder="Search a name or school">
+   <label class="chk"><input type="checkbox" id="onlybad"> Only problems</label>
+   <button id="addp" type="button">Add person</button>
+   <button id="more" type="button">Settings &amp; export</button>
+  </div>
+  <div id="selbar"><span id="seltext"></span><button id="unmatch" type="button">Unmatch</button><button id="selx" type="button">Cancel</button></div>
+ </div></div>
+ <main class="wrap">
+  <p class="stats" id="stats"></p>
+  <p class="small muted">Tap a person to select them, then tap someone else to swap them. Tap two unmatched people to pair them with each other. Use Unmatch to move someone to the unmatched list.</p>
+  <div class="list" id="list"></div>
+  <h2 class="unmh" id="unmh"></h2>
+  <p class="small muted" id="unmp">These people see: "We couldn't match you this time, but feel free to mingle!"</p>
+  <div class="unm" id="unm"></div>
+ </main>
+</section>
+
+<dialog id="dset">
+ <h2 style="margin-top:0">Settings &amp; export</h2>
+ <p class="small muted">GitHub details are saved only in this browser. The token needs <b>Contents: read and write</b> on the site's repo.</p>
+ <div class="form">
+  <label>GitHub username or org<input id="gh_owner" autocomplete="off"></label>
+  <label>Repo name<input id="gh_repo" autocomplete="off"></label>
+  <label>Branch<input id="gh_branch" placeholder="main" autocomplete="off"></label>
+  <label>Access token<input id="gh_token" type="password" autocomplete="off"></label>
+ </div>
+ <div class="actions">
+  <button type="button" id="dlcsv">Download CSV</button>
+  <button type="button" id="dldata">Download data.json + admin.json</button>
+  <button type="button" class="primary" id="saveset">Save</button>
+ </div>
+</dialog>
+
+<dialog id="dadd">
+ <h2 style="margin-top:0">Add a person</h2>
+ <p class="small muted">They'll start unmatched. They sign in with their first name + the last 4 digits of this phone number.</p>
+ <form class="form" id="addf">
+  <label>First name<input name="first" required></label>
+  <label>Last name<input name="last" required></label>
+  <label>Phone<input name="phone" inputmode="tel" required></label>
+  <label>Instagram<input name="ig"></label>
+  <label>School<input name="school"></label>
+  <label>Year<select name="year"><option></option><option>Freshman</option><option>Sophomore</option><option>Junior</option><option>Senior</option><option>Grad/other</option></select></label>
+  <label>Identifies as<select name="gender"><option>Female</option><option>Male</option><option value="">Other / not given</option></select></label>
+  <label>Wants<select name="want"><option>Male</option><option>Female</option><option>No preference</option></select></label>
+  <div class="actions full"><button type="button" id="addx">Cancel</button><button class="primary" type="submit">Add</button></div>
+ </form>
+</dialog>
+
+
+<div id="toast" role="status"></div>
+
+<script>
+{
+const $=s=>document.querySelector(s), $$=s=>[...document.querySelectorAll(s)];
+const enc=new TextEncoder(), dec=new TextDecoder();
+const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const b64d=s=>Uint8Array.from(atob(s),c=>c.charCodeAt(0));
+const b64e=u=>{let s='';for(let i=0;i<u.length;i+=8192)s+=String.fromCharCode(...u.subarray(i,i+8192));return btoa(s)};
+const hexd=h=>Uint8Array.from(h.match(/../g),x=>parseInt(x,16));
+const hexe=b=>[...b].map(x=>x.toString(16).padStart(2,'0')).join('');
+const toast=(m,ms=3500)=>{const t=$('#toast');t.textContent=m;t.style.display='block';clearTimeout(toast.t);toast.t=setTimeout(()=>t.style.display='none',ms)};
+const LS={get(k){try{return JSON.parse(localStorage.getItem(k)||'null')}catch(_){return null}},set(k,v){try{localStorage.setItem(k,JSON.stringify(v))}catch(_){}}};
+
+let S=null, AKEY=null, ASALT=null, AITER=0, R=0, sel=null, hist=[], dirty=false;
+const P=()=>new Map(S.people.map(p=>[p.id,p]));
+let PM=new Map();
+
+/* ---------- unlock ---------- */
+async function pwKey(pw,salt,iter){
+  const base=await crypto.subtle.importKey('raw',enc.encode(pw),'PBKDF2',false,['deriveBits']);
+  const bits=await crypto.subtle.deriveBits({name:'PBKDF2',hash:'SHA-256',salt,iterations:iter},base,256);
+  return crypto.subtle.importKey('raw',bits,'AES-GCM',false,['encrypt','decrypt']);
+}
+$('#gf').addEventListener('submit',async e=>{
+  e.preventDefault();$('#gerr').textContent='';$('#gbtn').disabled=true;$('#gbtn').textContent='Unlocking…';
+  try{
+    const a=await (await fetch('admin.json?v='+Date.now(),{cache:'no-store'})).json();
+    ASALT=b64d(a.salt);AITER=a.iter;AKEY=await pwKey($('#pw').value,ASALT,AITER);
+    const raw=b64d(a.data);
+    S=JSON.parse(dec.decode(await crypto.subtle.decrypt({name:'AES-GCM',iv:raw.slice(0,12)},AKEY,raw.slice(12))));
+    PM=P();$('#gate').style.display='none';$('#app').style.display='block';render();
+  }catch(err){$('#gerr').textContent=err.name==='OperationError'?'Wrong password.':"Couldn't load admin.json ("+err.message+')'}
+  finally{$('#gbtn').disabled=false;$('#gbtn').textContent='Unlock'}
+});
+
+/* ---------- checks ---------- */
+const short=p=>(p.gender?p.gender[0]:'?')+'→'+(p.want==='No preference'?'any':p.want?p.want[0]:'?');
+function problems(g){
+  const out=[];const ps=g.ids.map(i=>PM.get(i));
+  if(g.type==='match'&&ps.length===2){
+    const [a,b]=ps;
+    for(const [x,y] of [[a,b],[b,a]]){
+      if((x.want==='Male'||x.want==='Female')&&y.gender&&y.gender!==x.want)out.push(`${x.first} asked for ${x.want==='Male'?'guys':'girls'}`);
+      if(x.sp==='Same'&&x.sch!==y.sch)out.push(`${x.first} wanted the same school`);
+      if(x.sp==='Different'&&x.sch===y.sch&&x.sch!=='?')out.push(`${x.first} wanted a different school`);
+    }
+  }
+  return [...new Set(out)];
+}
+
+/* ---------- render ---------- */
+function chip(p,q){
+  return `<button type="button" class="chip${sel===p.id?' sel':''}${q&&(p.name+' '+p.school).toLowerCase().includes(q)?' hit':''}" data-id="${esc(p.id)}">${esc(p.name)}<small>${esc([p.school,p.year,short(p)].filter(Boolean).join(' · '))}</small></button>`;
+}
+function render(){
+  const q=$('#q').value.trim().toLowerCase(), only=$('#onlybad').checked;
+  const groups=S.rounds[0];
+  const hit=p=>(p.name+' '+p.school).toLowerCase().includes(q);
+  let shown=0,bad=0;
+  const pairs=groups.filter(g=>g.ids.length>1), solo=groups.filter(g=>g.ids.length===1).map(g=>PM.get(g.ids[0]));
+  const html=pairs.map(g=>{
+    const pr=problems(g);if(pr.length)bad++;
+    const ps=g.ids.map(i=>PM.get(i));
+    if(q&&!ps.some(hit))return'';if(only&&!pr.length)return'';shown++;
+    return `<div class="grp${pr.length?' bad':''}"><div class="chips">${ps.map(p=>chip(p,q)).join('')}</div><div></div>
+      <div class="warns">${pr.map(esc).join(' · ')}</div></div>`;
+  }).join('');
+  $('#list').innerHTML=html||(q||only?'<p class="muted">No pairs match that.</p>':'');
+  const us=solo.filter(p=>!q||hit(p)).sort((a,b)=>a.name.localeCompare(b.name));
+  const showSolo=!only;
+  $('#unmh').textContent=`Couldn't be matched (${solo.length})`;
+  ['#unmh','#unmp','#unm'].forEach(x=>$(x).style.display=showSolo?'':'none');
+  $('#unm').innerHTML=us.map(p=>chip(p,q)).join('')||'<p class="muted small">Nobody here matches that search.</p>';
+  $('#stats').textContent=`${pairs.length} pairs · ${pairs.reduce((n,g)=>n+g.ids.length,0)} matched · ${solo.length} unmatched${bad?` · ${bad} pair${bad>1?'s':''} flagged`:''}`;
+  const sp=sel&&PM.get(sel);
+  $('#selbar').classList.toggle('on',!!sp);
+  if(sp){const alone=S.rounds[0][gOf(sel)].ids.length===1;
+    $('#seltext').textContent=alone?`${sp.name} selected. Tap someone matched to swap them in, or another unmatched person to pair them.`:`${sp.name} selected. Tap someone to swap them, or Unmatch.`;
+    $('#unmatch').style.display=alone?'none':''}
+  $('#undo').disabled=!hist.length;$('#publish').disabled=!dirty;
+  $('#status').textContent=dirty?'Unpublished changes':'All changes published';
+}
+
+/* ---------- edits ---------- */
+const snap=()=>{hist.push(JSON.stringify({rounds:S.rounds,people:S.people}));if(hist.length>100)hist.shift()};
+const changed=()=>{dirty=true;render()};
+const gOf=id=>S.rounds[R].findIndex(g=>g.ids.includes(id));
+function detach(id){const gi=gOf(id);if(gi<0)return;const g=S.rounds[R][gi];g.ids=g.ids.filter(x=>x!==id);if(!g.ids.length)S.rounds[R].splice(gi,1)}
+function onChip(e){
+  const chip=e.target.closest('.chip');
+  if(!chip)return;
+  const id=chip.dataset.id;
+  if(!sel||sel===id){sel=sel===id?null:id;render();return}
+  const ga=S.rounds[R][gOf(sel)], gb=S.rounds[R][gOf(id)];
+  if(ga===gb){sel=id;render();return}
+  if(ga.ids.length===1&&gb.ids.length===1){snap();detach(sel);gb.ids.push(sel);gb.ids.sort((x,y)=>PM.get(x).name.localeCompare(PM.get(y).name));
+    toast(`Paired ${PM.get(sel).name} with ${PM.get(id).name}`);sel=null;changed();return}
+  snap();ga.ids[ga.ids.indexOf(sel)]=id;gb.ids[gb.ids.indexOf(id)]=sel;
+  toast(`Swapped ${PM.get(sel).name} ↔ ${PM.get(id).name}`);sel=null;changed();
+}
+$('#list').addEventListener('click',onChip);$('#unm').addEventListener('click',onChip);
+$('#unmatch').addEventListener('click',()=>{if(!sel)return;snap();detach(sel);S.rounds[R].push({type:'match',ids:[sel]});toast(`${PM.get(sel).name} is now unmatched`);sel=null;changed()});
+$('#selx').addEventListener('click',()=>{sel=null;render()});
+$('#undo').addEventListener('click',()=>{const h=hist.pop();if(!h)return;const o=JSON.parse(h);S.rounds=o.rounds;S.people=o.people;PM=P();sel=null;dirty=true;render()});
+$('#q').addEventListener('input',render);$('#onlybad').addEventListener('change',render);
+addEventListener('beforeunload',e=>{if(dirty){e.preventDefault();e.returnValue=''}});
+
+/* ---------- add person ---------- */
+const NICK=[['will','william'],['ben','benjamin'],['alex','alexander'],['matt','matthew'],['dan','daniel'],['nick','nicholas'],['chris','christopher'],['jon','jonathan'],['josh','joshua'],['andy','andrew'],['tony','anthony'],['kate','katherine'],['liz','elizabeth'],['abby','abigail'],['jess','jessica'],['steph','stephanie'],['vicky','victoria'],['mike','michael'],['jake','jacob'],['zach','zachary'],['max','maxwell'],['cathy','catherine'],['sam','samuel'],['sam','samantha']];
+const norm=s=>String(s||'').toLowerCase().replace(/[^a-z]/g,'');
+function variants(first){const v=new Set([norm(first),norm(String(first).trim().split(/\s+/)[0])]);for(const[a,b]of NICK){if(v.has(a))v.add(b);if(v.has(b))v.add(a)}return[...v].filter(Boolean)}
+async function siteBits(login){
+  const base=await crypto.subtle.importKey('raw',enc.encode(login),'PBKDF2',false,['deriveBits']);
+  return new Uint8Array(await crypto.subtle.deriveBits({name:'PBKDF2',hash:'SHA-256',salt:b64d(S.site.salt),iterations:S.site.iter},base,384));
+}
+$('#addp').addEventListener('click',()=>{$('#addf').reset();$('#dadd').showModal()});
+$('#addx').addEventListener('click',()=>$('#dadd').close());
+$('#addf').addEventListener('submit',async e=>{
+  e.preventDefault();const f=Object.fromEntries(new FormData(e.target));
+  let dg=f.phone.replace(/\D/g,'');if(dg.length===11&&dg[0]==='1')dg=dg.slice(1);
+  if(dg.length<4){toast('Phone needs at least 4 digits');return}
+  const l4=dg.slice(-4);const taken=new Set(S.people.flatMap(p=>p.logins.map(x=>x[0])));
+  const logins=[];
+  for(const v of variants(f.first)){const b=await siteBits(v+'|'+l4);const id=hexe(b.slice(0,16));
+    if(taken.has(id)){toast(`Someone named ${f.first} already uses ${l4}. Use a different number.`);return}
+    logins.push([id,hexe(b.slice(16))])}
+  snap();
+  const p={id:'n'+Date.now(),name:`${f.first.trim()} ${f.last.trim()}`,first:f.first.trim(),school:f.school.trim(),year:f.year,gender:f.gender,want:f.want,sp:'',sch:f.school.trim()||'?',
+    phone:dg.length===10?`(${dg.slice(0,3)}) ${dg.slice(3,6)}-${dg.slice(6)}`:f.phone,ig:f.ig.replace(/^@/,'').trim(),study:'',pers:'',aes:'',hobbies:'',music:'',ms:[],ht:[],st:[],wt:[],logins,codes:[l4]};
+  S.people.push(p);PM=P();S.rounds.forEach(rd=>rd.push({type:'match',ids:[p.id]}));
+  $('#dadd').close();$('#q').value='';sel=p.id;changed();toast(`Added ${p.name}. They're in the unmatched list and selected: tap someone to pair them.`,6000);
+});
+
+/* ---------- build + publish ---------- */
+const inter=(a,b)=>{const s=new Set(b||[]);return (a||[]).filter(x=>s.has(x))};
+const SKIP_H=new Set('music friends going out playing watching listening hanging new things stuff time lots trying random etc'.split(' '));
+const SKIP_S=new Set('major minor majoring minoring studying study intended intending undecided maybe prob probably double concentration track pre'.split(' '));
+const SKIP_W=new Set('person people very pretty kind sometimes little bit lot always style aesthetic vibe vibes'.split(' '));
+const YRS={Freshman:'freshmen',Sophomore:'sophomores',Junior:'juniors',Senior:'seniors'};
+const cap=s=>s.replace(/\b\w/g,c=>c.toUpperCase());
+const list=a=>a.length<=1?a.join(''):a.slice(0,-1).join(', ')+' and '+a[a.length-1];
+function common(p,o){
+  const out=[];
+  if(p.sch&&p.sch!=='?'&&p.sch===o.sch)out.push(`You're both at ${p.sch}`);
+  if(p.year&&p.year===o.year&&YRS[p.year])out.push(`You're both ${YRS[p.year]}`);
+  const m=inter(p.ms,o.ms).slice(0,3).map(cap);if(m.length)out.push(`You both listen to ${list(m)}`);
+  const h=inter(p.ht,o.ht).filter(x=>!SKIP_H.has(x)).slice(0,3);if(h.length)out.push(`You both mentioned ${list(h)} as a hobby`);
+  const s=inter(p.st,o.st).filter(x=>!SKIP_S.has(x)).slice(0,2);if(s.length)out.push(`You both study ${list(s)}`);
+  const w=inter(p.wt,o.wt).filter(x=>!SKIP_W.has(x)).slice(0,3);if(w.length)out.push(`You both described yourselves as ${list(w)}`);
+  return {lines:out.slice(0,4),music:m,hobbies:h};
+}
+function cardsFor(p,r){
+  const g=S.rounds[r].find(x=>x.ids.includes(p.id));if(!g)return[];
+  return g.ids.filter(i=>i!==p.id).map(i=>{const o=PM.get(i);const c=common(p,o);
+    return{kind:g.type,name:o.name,phone:o.phone,ig:o.ig,common:c.lines,cm:c.music,ch:c.hobbies}});
+}
+async function seal(key,obj){
+  const iv=crypto.getRandomValues(new Uint8Array(12));
+  const ct=new Uint8Array(await crypto.subtle.encrypt({name:'AES-GCM',iv},key,enc.encode(JSON.stringify(obj))));
+  const blob=new Uint8Array(12+ct.length);blob.set(iv);blob.set(ct,12);return b64e(blob);
+}
+async function buildFiles(){
+  const recs=[];
+  for(const p of S.people){
+    const r1=cardsFor(p,0);
+    for(const [id,k] of p.logins){
+      const kb=hexd(k);
+      const key=await crypto.subtle.importKey('raw',kb,'AES-GCM',false,['encrypt']);
+      recs.push([id,await seal(key,{first:p.first,me:p.name,r1})]);
+    }
+  }
+  for(let i=recs.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[recs[i],recs[j]]=[recs[j],recs[i]]}
+  const data=JSON.stringify({salt:S.site.salt,iter:S.site.iter,r:recs});
+  const iv=crypto.getRandomValues(new Uint8Array(12));
+  const ct=new Uint8Array(await crypto.subtle.encrypt({name:'AES-GCM',iv},AKEY,enc.encode(JSON.stringify(S))));
+  const blob=new Uint8Array(12+ct.length);blob.set(iv);blob.set(ct,12);
+  const admin=JSON.stringify({salt:b64e(ASALT),iter:AITER,data:b64e(blob)});
+  return {data,admin};
+}
+async function ghPut(gh,path,text){
+  const base=`https://api.github.com/repos/${encodeURIComponent(gh.owner)}/${encodeURIComponent(gh.repo)}/contents/${path}`;
+  const h={Authorization:'Bearer '+gh.token,Accept:'application/vnd.github+json'};
+  const br=gh.branch||'main';
+  const cur=await fetch(`${base}?ref=${encodeURIComponent(br)}`,{headers:h,cache:'no-store'});
+  if(cur.status===401||cur.status===403)throw new Error('GitHub rejected the token. Check it in Settings.');
+  const sha=cur.ok?(await cur.json()).sha:undefined;
+  const r=await fetch(base,{method:'PUT',headers:h,body:JSON.stringify({message:`Update ${path} from organizer page`,content:b64e(enc.encode(text)),sha,branch:br})});
+  if(!r.ok)throw new Error(`GitHub said ${r.status} for ${path}: ${(await r.json().catch(()=>({}))).message||''}`);
+}
+$('#publish').addEventListener('click',async()=>{
+  const gh=LS.get('csa-gh');
+  if(!gh||!gh.owner||!gh.repo||!gh.token){openSettings();toast('Add your GitHub details first, or use Download.');return}
+  const b=$('#publish');b.disabled=true;b.textContent='Publishing…';
+  try{const f=await buildFiles();await ghPut(gh,'data.json',f.data);await ghPut(gh,'admin.json',f.admin);
+    dirty=false;hist=[];render();toast('Published. The site updates in about a minute.',6000)}
+  catch(err){toast(err.message,8000);b.disabled=false}
+  finally{b.textContent='Publish'}
+});
+
+/* ---------- settings + export ---------- */
+function openSettings(){const gh=LS.get('csa-gh')||{};['owner','repo','branch','token'].forEach(k=>$('#gh_'+k).value=gh[k]||'');$('#dset').showModal()}
+$('#more').addEventListener('click',openSettings);
+$('#saveset').addEventListener('click',()=>{const gh={};['owner','repo','branch','token'].forEach(k=>gh[k]=$('#gh_'+k).value.trim());LS.set('csa-gh',gh);$('#dset').close();toast('Saved')});
+function download(name,text,type){const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([text],{type}));a.download=name;document.body.appendChild(a);a.click();a.remove()}
+$('#dldata').addEventListener('click',async()=>{const f=await buildFiles();download('data.json',f.data,'application/json');setTimeout(()=>download('admin.json',f.admin,'application/json'),400)});
+$('#dlcsv').addEventListener('click',()=>{
+  const q=s=>'"'+String(s??'').replace(/"/g,'""')+'"';
+  const g=S.rounds[0], lines=[['Status','Person A','Person B'].join(',')];
+  g.filter(x=>x.ids.length>1).forEach(x=>lines.push(['Matched',...x.ids.map(i=>PM.get(i).name)].map(q).join(',')));
+  g.filter(x=>x.ids.length===1).forEach(x=>lines.push(['Unmatched',PM.get(x.ids[0]).name,''].map(q).join(',')));
+  download('csa-matches.csv',lines.join('\n'),'text/csv');
+});
+}
+</script>
+</body>
+</html>

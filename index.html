@@ -1,0 +1,319 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>CSA Formal Matches</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@500;600;700&family=Manrope:wght@400;500;600;700&family=Noto+Serif+SC:wght@700&display=swap" rel="stylesheet">
+<style>
+/* VOICE: warm, celebratory, a little formal: a gala night, not an app.
+   IDEA: a red envelope (hongbao) you open to find your place cards.
+   PICTURE: the envelope itself holds the sign-in; inside are two place cards, one per round.
+   COLOUR and TYPE: lacquer red ground, ivory card stock, one gold accent; Cormorant titles, Manrope body.
+   LAYOUT: one centred column; envelope on load, then the cards stacked, side by side above 760px. */
+:root{color-scheme:light dark;
+ --bg:light-dark(#b3121f,#5a0a10);--bg2:light-dark(#9a0e1a,#3f070b);
+ --card:light-dark(#fffaf1,#1e1513);--ink:light-dark(#2a1512,#f6ece0);--muted:light-dark(#7a5a52,#c6aea3);
+ --gold:light-dark(#c99a2e,#e2b553);--line:light-dark(#ead9c2,#3a2a25);--on-red:#fff6ea}
+:root[data-theme=light]{color-scheme:light}:root[data-theme=dark]{color-scheme:dark}
+*{box-sizing:border-box;min-width:0}
+body{margin:0;min-height:100vh;color:var(--ink);font:16px/1.55 Manrope,system-ui,sans-serif;overflow-x:clip;
+ background:radial-gradient(1200px 600px at 50% -10%,color-mix(in srgb,var(--gold) 22%,transparent),transparent 60%),
+ repeating-radial-gradient(circle at 0 0,transparent 0 22px,color-mix(in srgb,var(--bg2) 55%,transparent) 22px 23px),var(--bg)}
+main{max-width:980px;margin:0 auto;padding:clamp(28px,5vw,64px) max(5vw,16px) 64px}
+header{text-align:center;color:var(--on-red);margin-bottom:28px}
+header .zh{font:700 22px/1 "Noto Serif SC",serif;color:var(--gold);letter-spacing:.3em;margin-inline-start:.3em}
+h1{font:600 clamp(36px,6vw,52px)/1.05 "Cormorant Garamond",serif;margin:10px 0 8px;text-wrap:balance}
+header p{margin:0 auto;max-width:34em;opacity:.88}
+.env{position:relative;max-width:440px;margin:0 auto;background:linear-gradient(170deg,#d2232f,#a20f1b);border-radius:14px;
+ padding:120px 28px 30px;box-shadow:0 24px 60px rgba(0,0,0,.35),inset 0 0 0 1px rgba(255,255,255,.08);color:var(--on-red);overflow:hidden}
+.env svg.flap{position:absolute;inset:0 0 auto 0;width:100%;height:150px}
+.seal{position:absolute;left:50%;top:92px;transform:translateX(-50%);width:64px;height:64px;border-radius:50%;
+ background:radial-gradient(circle at 35% 30%,#f3d27a,var(--gold) 55%,#9c7420);display:grid;place-items:center;
+ font:700 28px/1 "Noto Serif SC",serif;color:#7a1010;box-shadow:0 6px 14px rgba(0,0,0,.3)}
+form{display:grid;gap:14px;margin-top:22px}
+label{font-weight:600;font-size:14px}
+input{width:100%;font:16px Manrope,sans-serif;padding:12px 14px;min-height:48px;border-radius:10px;border:1px solid rgba(255,255,255,.35);
+ background:rgba(255,255,255,.12);color:#fff}
+input::placeholder{color:rgba(255,246,234,.6)}
+input:focus-visible,button:focus-visible,a:focus-visible{outline:3px solid var(--gold);outline-offset:2px}
+button{font:700 16px Manrope,sans-serif;min-height:48px;border:0;border-radius:10px;background:var(--gold);color:#3b1206;cursor:pointer}
+button:disabled{opacity:.6;cursor:wait}
+.err{min-height:1.4em;font-size:14px;color:#ffe2a8}
+.hint{font-size:13px;opacity:.8;margin:6px 0 0}
+#result{display:none}
+.hello{color:var(--on-red);text-align:center;margin-bottom:22px}
+.hello h2{font:600 clamp(30px,5vw,40px)/1.1 "Cormorant Garamond",serif;margin:0 0 4px}
+.cards{display:grid;gap:22px;grid-template-columns:minmax(0,1fr)}
+.cards{max-width:520px;margin:0 auto}
+.pc{background:var(--card);border-radius:12px;padding:26px 24px 22px;box-shadow:0 18px 44px rgba(0,0,0,.28);position:relative;
+ border:1px solid var(--line)}
+.cards.anim .pc{animation:rise .6s ease both}
+.cards.anim .pc:nth-child(2){animation-delay:.12s}
+@keyframes rise{from{opacity:0;transform:translateY(14px)}}
+@media(prefers-reduced-motion:reduce){.cards.anim .pc{animation:none}}
+.pc::before{content:"";position:absolute;inset:8px;border:1px solid color-mix(in srgb,var(--gold) 55%,transparent);border-radius:8px;pointer-events:none}
+.rnd{display:flex;justify-content:space-between;align-items:center;gap:10px;font-size:13px;font-weight:700;color:var(--muted)}
+.tag{padding:3px 10px;border-radius:99px;font-size:13px;white-space:nowrap;background:color-mix(in srgb,var(--bg) 14%,transparent);color:light-dark(#9a0e1a,#ffb4ae)}
+.tag.friend{background:color-mix(in srgb,var(--gold) 22%,transparent);color:light-dark(#6d4d0c,#f1d18a)}
+.pc h3{font:600 34px/1.05 "Cormorant Garamond",serif;margin:12px 0 4px;text-wrap:balance}
+.meta{color:var(--muted);font-size:15px;margin:0 0 14px}
+.contact{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:14px}
+.chip{display:inline-flex;align-items:center;gap:6px;min-height:40px;padding:6px 12px;border-radius:8px;border:1px solid var(--line);
+ font-weight:600;font-size:15px;color:var(--ink);text-decoration:none;background:transparent;cursor:pointer;white-space:nowrap}
+dl{margin:0;display:grid;gap:8px;font-size:15px}
+dt{font-size:13px;font-weight:700;color:var(--muted)}dd{margin:0 0 4px}
+.common{margin:14px 0 0;font-size:14px;padding:10px 12px;border-radius:8px;background:color-mix(in srgb,var(--gold) 14%,transparent)}
+.note{font-size:15px;color:var(--muted);margin:10px 0 0}
+.sec{margin-top:18px}
+.sec h4{margin:0 0 6px;font-size:13px;font-weight:700;color:var(--muted)}
+.sec ul{margin:0;padding-left:18px;display:grid;gap:4px;font-size:15px}
+.games{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:12px}
+.games button{min-height:40px;padding:0 12px;font-size:14px;font-weight:600;background:transparent;color:var(--ink);border:1px solid var(--line)}
+.games button[aria-pressed=true]{background:var(--bg);border-color:var(--bg);color:#fff}
+.prompt{border-radius:10px;padding:16px;background:color-mix(in srgb,var(--gold) 16%,transparent);font:600 21px/1.3 "Cormorant Garamond",serif;min-height:84px}
+.prompt small{display:block;font:700 12px/1.4 Manrope,sans-serif;color:var(--muted);margin-bottom:6px}
+.acts{display:flex;flex-wrap:wrap;gap:8px;margin-top:10px}
+.acts button{min-height:42px;padding:0 16px;font-size:14px}
+.acts .ghost{background:transparent;color:var(--ink);border:1px solid var(--line)}
+.fine{font-size:12px;color:var(--muted);margin:8px 0 0}
+.ice ol{margin:0;padding-left:20px;display:grid;gap:8px;font-size:15px}
+.shuffle{margin-top:10px;min-height:40px;padding:0 14px;font-size:14px;background:transparent;color:var(--ink);border:1px solid var(--line)}
+.mingle{text-align:center;padding:34px 26px}
+.mingle .lk{width:64px;height:64px;border-radius:50%;display:grid;place-items:center;margin:0 auto 14px;
+ background:radial-gradient(circle at 35% 30%,#f3d27a,var(--gold) 55%,#9c7420);font:700 26px/1 "Noto Serif SC",serif;color:#7a1010}
+.mingle p{font-size:16px;color:var(--ink);margin:8px 0 0}
+.locked{display:grid;place-items:center;text-align:center;min-height:260px;color:var(--muted)}
+.locked .lk{width:64px;height:64px;border-radius:50%;display:grid;place-items:center;margin:0 auto 12px;
+ background:radial-gradient(circle at 35% 30%,#f3d27a,var(--gold) 55%,#9c7420);font:700 26px/1 "Noto Serif SC",serif;color:#7a1010}
+.locked h3{color:var(--ink)}
+.pulse{display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--gold);margin-right:6px;animation:pl 1.6s ease-in-out infinite}
+@keyframes pl{50%{opacity:.25}}
+@media(prefers-reduced-motion:reduce){.pulse{animation:none}}
+.sep{border:0;border-top:1px dashed var(--line);margin:20px 0 4px}
+.again{display:block;margin:26px auto 0;background:transparent;color:var(--on-red);border:1px solid rgba(255,255,255,.4);padding:0 22px}
+footer{text-align:center;color:var(--on-red);opacity:.75;font-size:13px;margin-top:34px}
+</style>
+</head>
+<body>
+<main>
+ <header>
+  <div class="zh">缘分</div>
+  <h1>CSA Formal Matches</h1>
+  <p>Open your envelope to see who you're meeting tonight.</p>
+ </header>
+
+ <section class="env" id="login">
+  <svg class="flap" viewBox="0 0 440 150" preserveAspectRatio="none" aria-hidden="true">
+   <path d="M0 0H440V40L220 132L0 40Z" fill="#b5161f"/>
+   <path d="M0 40L220 132L440 40" fill="none" stroke="rgba(0,0,0,.25)" stroke-width="2"/>
+   <path d="M0 0H440V6L220 98L0 6Z" fill="rgba(255,255,255,.06)"/>
+  </svg>
+  <div class="seal" aria-hidden="true">囍</div>
+  <form id="f" autocomplete="off">
+   <div><label for="fn">First name</label><input id="fn" placeholder="As you wrote it on the form" autocapitalize="words" required></div>
+   <div><label for="l4">Last 4 digits of your phone</label><input id="l4" inputmode="numeric" pattern="[0-9]{4}" maxlength="4" placeholder="1234" required></div>
+   <button id="go" type="submit">Open my envelope</button>
+   <div class="err" id="err" role="alert"></div>
+  </form>
+  <p class="hint">Use the first name and phone number you put on the matching form.</p>
+ </section>
+
+ <section id="result" aria-live="polite">
+  <div class="hello"><h2 id="hi"></h2><div id="sub"></div></div>
+  <div class="cards" id="cards"></div>
+  <button class="again" id="again" type="button">Not you? Sign out</button>
+ </section>
+
+ <footer>Chinese Students Association · Formal 2026</footer>
+</main>
+
+<script>
+{
+const $=s=>document.querySelector(s);
+const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const b64=s=>Uint8Array.from(atob(s),c=>c.charCodeAt(0));
+const hex=b=>[...b].map(x=>x.toString(16).padStart(2,'0')).join('');
+const LS={get(k){try{return JSON.parse(localStorage.getItem(k)||'null')}catch(_){return null}},set(k,v){try{v==null?localStorage.removeItem(k):localStorage.setItem(k,JSON.stringify(v))}catch(_){}}};
+const fresh=u=>fetch(u+'?v='+Date.now(),{cache:'no-store'}).then(r=>r.json());
+let DATA=null,IDX=null,ME=null,KEY=null;
+const shuffles=[0,0];
+
+const ICE=["What's your go-to boba order, and how sweet?","Hot pot or KBBQ? Defend your answer.","What song do you have on repeat right now?",
+"What's the most spontaneous thing you've done this year?","What was your childhood dream job?","What's a hidden talent nobody would guess you have?",
+"What's the best thing you've eaten this month?","If you could teleport anywhere for dinner tonight, where would you go?","What's your ideal lazy Sunday?",
+"What's a hill you'd die on?","What's your Chinese zodiac sign, and does it fit you?","What's the best class you've ever taken?",
+"What's something you've always wanted to learn?","Which dumpling is the best dumpling?","What's your most-used emoji?",
+"What would your friends say is your most chaotic trait?","What's a show you'd recommend to a stranger?","Morning person or night owl?",
+"What's your comfort food from home?","What's the last thing that made you laugh really hard?"];
+const BANK={
+spicy:[["What's your type, and how often do you actually end up dating it?"],["What's the biggest green flag on a first date?"],["What's an instant ick for you?"],
+["What's the worst pickup line that's ever worked on you, or that you've used?"],["Have you ever been in a situationship? How did it end?"],
+["What's the boldest move you've ever made on a crush?"],["Who was your first crush, and did they ever find out?"],["Dating apps: love them, hate them, or secretly on one right now?"],
+["What's the most embarrassing thing you've done in front of a crush?"],["What's your love language?"],["What's the longest you've liked someone without saying anything?"],
+["Have you ever been ghosted, or done the ghosting?"],["What's your most chaotic dating story?"],["Would you ever date someone in your friend group?"],
+["What's the most romantic thing someone has done for you?"],["What's a red flag you've ignored because they were cute?"],["Who in your friend group has the most dramatic love life?"],
+["What was your first impression of me? Be honest.","m"],["Rate tonight's chemistry so far from 1 to 10.","m"],["If we went on a real date, where would you take me?","m"],
+["What's the cheesiest thing you secretly find romantic?"],["Could you do long distance?"],["What's your go-to first date idea?"],["Have you ever slid into someone's DMs? Did it work?"],
+["How deep have you gone on someone's Instagram before meeting them?"],["Have you ever had a crush on a classmate in a lecture you barely went to?"],["What's the worst date you've ever been on?"],
+["What instantly makes someone more attractive to you?"],["Love at first sight: real or fake?"],["Who usually texts first, you or them?"],["What's one dating rule you always end up breaking?"],
+["Have you ever gotten back with an ex?"],["What song reminds you of someone you used to like?"],["Do your parents ask about your love life? What do you tell them?"],
+["Has an auntie or family friend ever tried to set you up?"],["What would your mom think of your type?"],["Are you a hopeless romantic or a hopeless realist?"]],
+nhie:[["had a crush on a friend's ex"],["gone on a date with someone from a dating app"],["matched on an app with someone I already knew"],["sent a risky text and immediately put my phone face down"],
+["texted an ex after midnight"],["accidentally liked an old photo while stalking someone's Instagram"],["had a crush on a TA"],["ghosted someone"],["been ghosted after a date I thought went well"],
+["said \"I love you\" first"],["had a secret relationship"],["been in a situationship for more than three months"],["kissed someone on a first date"],["had a crush on two people at the same time"],
+["gone on a date mostly for the free food"],["faked being busy to get out of a date"],["had my friends write a text to my crush for me"],["cried over someone I never actually dated"],
+["dated someone my parents never found out about"],["had a relative try to set me up"],["had a crush on someone at this formal"],["shot my shot at a CSA event"],["danced with a total stranger at a party"],
+["been caught checking someone out"],["flirted my way out of trouble"],["had a celebrity crush last more than five years"],["written a long birthday paragraph for a crush"],["had a crush on a roommate"],
+["been turned down and pretended I was joking"],["fallen for someone because of their playlist"],["dated someone from a different school"],["been someone's secret crush and found out way later"],
+["changed my outfit three times before a date"],["practiced a conversation with my crush in the mirror"],["left someone on read on purpose"],["had a crush on my best friend's sibling"],
+["made a playlist for someone I liked"],["gone to an event just because my crush would be there"]],
+truth:[["Who at this formal would you most want to dance with tonight?"],["What's the last thing you searched on your phone?"],["What's the most recent text you sent to someone you had a crush on?"],
+["What's your screen time today?"],["What's the most embarrassing photo in your camera roll? Describe it, don't show it."],["Who was your last crush?"],["What's the pettiest reason you stopped talking to someone?"],
+["What's the biggest lie you've told on a first date?"],["Have you ever liked someone your friend was dating?"],["What's something your parents still don't know about you?"],
+["Who was the last person you looked up on Instagram?"],["What's the most embarrassing nickname you've ever had?"],["What's the most rebellious thing you've done in college?"],
+["What do you honestly think of my outfit?","m"],["What's the first thing you noticed about me?","m"],["What's the most dramatic thing you've done to get someone's attention?"],
+["Have you ever had a crush on someone in CSA?"],["What's something you pretended to like for someone you were into?"],["What's your biggest dating dealbreaker?"],
+["What's the longest you've waited to reply to a text on purpose?"],["What would your ex say about you?"],["If you had to date someone in your phone contacts, who would it be?"],
+["What's the boldest thing you've done on a night out?"],["What's a compliment you've never forgotten?"]],
+dare:[["Hit your match with your best pickup line."],["Show the last photo in your camera roll."],["Do a runway walk to the end of the table and back."],
+["Let your match look at your Spotify top songs and roast them."],["Text your best friend \"I think I just met the one\" and show the reply."],["Do an impression of a celebrity until your match guesses who it is."],
+["Talk in a British accent until your next turn."],["Teach your match a dance move, or make one up on the spot."],["Hold eye contact with your match for 20 seconds without laughing."],
+["Let your match write your next Instagram story caption. You can veto it."],["Show your most-used emoji and explain why."],["Give your match a compliment in another language."],
+["Wave at someone across the room until they wave back."],["Show your screen time and let your match judge you."],["Act out a K-drama confession scene."],
+["Save your match in your phone under a nickname they pick."],["Describe your ideal date in exactly three words."],["Do your best dance move for 10 seconds."],
+["Swap one accessory with your match for the rest of the round.","m"],["Take the most dramatic selfie you can together."],["Recreate your most awkward photo pose."],
+["Give a 15-second toast to tonight like you're the best man or maid of honor."],["Do your best \"caught my crush looking at me\" face."],["Narrate the room like a nature documentary for 20 seconds."]]};
+const GAMES=[['ice','Icebreakers'],['spicy','Spicy questions'],['nhie','Never have I ever'],['tod','Truth or dare']];
+const GS=[{mode:'ice',step:{},tod:null},{mode:'ice',step:{},tod:null}];
+function order(bank,seedStr,friend){
+  const items=BANK[bank].filter(x=>!(friend&&x[1]==='m')).map(x=>x[0]);
+  let seed=hash(seedStr);
+  for(let i=items.length-1;i>0;i--){seed=Math.imul(seed^(seed>>>15),2246822507)>>>0;const j=seed%(i+1);[items[i],items[j]]=[items[j],items[i]]}
+  return items;
+}
+function hash(str){let h=2166136261;for(const c of str){h^=c.charCodeAt(0);h=Math.imul(h,16777619)}return h>>>0}
+function icebreakers(list,round){
+  const names=[ME.me,...list.map(c=>c.name)].sort().join('|');
+  let seed=hash(names+'#'+round+'#'+shuffles[round]);
+  const out=[],c=list[0]||{};
+  if(shuffles[round]===0){
+    if(c.cm&&c.cm.length)out.push(`You both listen to ${c.cm[0]}. Which song of theirs would you put on right now?`);
+    if(c.ch&&c.ch.length)out.push(`You both mentioned ${c.ch[0]}. How did each of you get into it?`);
+  }
+  const pool=[...ICE];
+  while(out.length<3&&pool.length){seed=Math.imul(seed^(seed>>>15),2246822507)>>>0;out.push(pool.splice(seed%pool.length,1)[0])}
+  return out.slice(0,3);
+}
+
+async function lookup(first,l4){
+  if(!DATA){DATA=await fresh('data.json');IDX=new Map(DATA.r)}
+  const enc=new TextEncoder();
+  const base=await crypto.subtle.importKey('raw',enc.encode(first+'|'+l4),'PBKDF2',false,['deriveBits']);
+  const bits=new Uint8Array(await crypto.subtle.deriveBits({name:'PBKDF2',hash:'SHA-256',salt:b64(DATA.salt),iterations:DATA.iter},base,384));
+  const blob=IDX.get(hex(bits.slice(0,16)));
+  if(!blob)return null;
+  KEY=bits.slice(16);
+  return JSON.parse(await open(KEY,blob));
+}
+async function open(keyBytes,blob){
+  const raw=b64(blob);
+  const key=await crypto.subtle.importKey('raw',keyBytes,'AES-GCM',false,['decrypt']);
+  return new TextDecoder().decode(await crypto.subtle.decrypt({name:'AES-GCM',iv:raw.slice(0,12)},key,raw.slice(12)));
+}
+function contact(c){
+  return `<div class="contact">${c.phone?`<button class="chip" type="button" data-copy="${esc(c.phone)}">${esc(c.phone)}</button>`:'<span class="chip">No phone given</span>'}${
+    c.ig?`<a class="chip" href="https://instagram.com/${encodeURIComponent(c.ig)}" target="_blank" rel="noopener">@${esc(c.ig)}</a>`:''}</div>`;
+}
+function card(list,i){
+  const head=t=>`<div class="rnd"><span>CSA Formal</span>${t||''}</div>`;
+  if(!list||!list.length) return `<article class="pc mingle"><div class="lk">缘</div><h3>We couldn't match you this time</h3>
+    <p>But feel free to mingle! There are plenty of people here tonight, so go say hi.</p></article>`;
+  const friend=list[0].kind==='friend', trio=list.length>1;
+  const tag=`<span class="tag ${friend?'friend':''}">${friend?(trio?'Friend trio':'Friend match'):'Your match'}</span>`;
+  const people=list.map(c=>`<h3>${esc(c.name)}</h3>${contact(c)}`).join('');
+  const lines=[...new Set(list.flatMap(c=>c.common||[]))];
+  const common=`<div class="sec"><h4>What you have in common</h4>${lines.length?`<ul>${lines.map(l=>`<li>${esc(l)}</li>`).join('')}</ul>`
+    :`<p class="note" style="margin:0">Nothing obvious from the form, so you'll have to find out!</p>`}</div>`;
+  const ice=game(list,i,friend);
+  const intro=friend?`<p class="note">${trio?"This round you're meeting two new friends.":"This round you're meeting a new friend."}</p>`:'';
+  return `<article class="pc">${head(tag)}${intro}${people}${common}${ice}</article>`;
+}
+function game(list,i,friend){
+  const g=GS[i];
+  const tabs=`<div class="games" role="group" aria-label="Pick a game">${GAMES.map(([k,l])=>`<button type="button" data-game="${k}" data-r="${i}" aria-pressed="${g.mode===k}">${l}</button>`).join('')}</div>`;
+  let body='';
+  if(g.mode==='ice'){
+    body=`<ol>${icebreakers(list,i).map(q=>`<li>${esc(q)}</li>`).join('')}</ol><button class="shuffle" type="button" data-shuffle="${i}">New questions</button>`;
+  }else{
+    const bank=g.mode==='tod'?g.tod:g.mode;
+    if(!bank){
+      body=`<div class="prompt"><small>Truth or dare</small>Whose turn is it? Pick one.</div>
+        <div class="acts"><button type="button" data-tod="truth" data-r="${i}">Truth</button><button type="button" data-tod="dare" data-r="${i}">Dare</button></div>`;
+    }else{
+      const seq=order(bank,[ME.me,...list.map(c=>c.name)].sort().join('|')+'#'+i+'#'+bank,friend);
+      const n=g.step[bank]||0, q=seq[n%seq.length];
+      const label={spicy:'Spicy question',nhie:'Never have I ever…',truth:'Truth',dare:'Dare'}[bank];
+      const text=bank==='nhie'?'Never have I ever '+q+'.':q;
+      const next=g.mode==='tod'
+        ?`<button type="button" data-tod="truth" data-r="${i}" data-next="1">Next: truth</button><button type="button" data-tod="dare" data-r="${i}" data-next="1">Next: dare</button>`
+        :`<button type="button" data-step="${bank}" data-r="${i}">Next</button>`;
+      body=`<div class="prompt"><small>${label}</small>${esc(text)}</div>
+        <div class="acts">${next}<button type="button" class="ghost" data-step="${bank}" data-r="${i}">Skip this one</button></div>
+        ${bank==='nhie'?'<p class="fine">If you have, put a finger down.</p>':''}`;
+    }
+  }
+  return `<div class="sec ice"><h4>Pick a game</h4>${tabs}${body}<p class="fine">Anyone can skip any question, no explanation needed.</p></div>`;
+}
+function render(anim){
+  const has=ME.r1&&ME.r1.length;
+  $('#hi').textContent=`Hi ${ME.first}!`;
+  $('#sub').textContent=has?"Here's your match for tonight.":'';
+  $('#cards').classList.toggle('anim',!!anim);
+  $('#cards').innerHTML=card(ME.r1,0);
+}
+async function signIn(first,l4,quiet){
+  const p=await lookup(first,l4);
+  if(!p){if(quiet)LS.set('csa-login',null);return false}
+  ME=p;LS.set('csa-login',{f:first,l:l4});
+  $('#login').style.display='none';$('#result').style.display='block';render(true);
+  return true;
+}
+
+$('#f').addEventListener('submit',async e=>{
+  e.preventDefault();
+  const first=$('#fn').value.toLowerCase().replace(/[^a-z]/g,'');
+  const l4=$('#l4').value.replace(/\D/g,'');
+  $('#err').textContent='';
+  if(!first||l4.length!==4){$('#err').textContent='Enter your first name and exactly 4 digits.';return}
+  const btn=$('#go');btn.disabled=true;btn.textContent='Opening…';
+  try{
+    if(!await signIn(first,l4))$('#err').textContent="We couldn't find that combination. Check the spelling of your first name and the last 4 digits you put on the form.";
+    else window.scrollTo({top:0,behavior:'smooth'});
+  }catch(err){$('#err').textContent='Something went wrong loading the matches. Refresh and try again.'}
+  finally{btn.disabled=false;btn.textContent='Open my envelope'}
+});
+$('#cards').addEventListener('click',async e=>{
+  const gm=e.target.closest('[data-game]');
+  if(gm){const g=GS[+gm.dataset.r];g.mode=gm.dataset.game;if(g.mode==='tod')g.tod=null;render();return}
+  const st=e.target.closest('[data-step]');
+  if(st){const g=GS[+st.dataset.r];g.step[st.dataset.step]=(g.step[st.dataset.step]||0)+1;render();return}
+  const td=e.target.closest('[data-tod]');
+  if(td){const g=GS[+td.dataset.r],k=td.dataset.tod;if(td.dataset.next&&g.tod)g.step[g.tod]=(g.step[g.tod]||0)+1;g.tod=k;render();return}
+  const sh=e.target.closest('[data-shuffle]');
+  if(sh){shuffles[+sh.dataset.shuffle]++;render();return}
+  const b=e.target.closest('[data-copy]');if(!b)return;
+  try{await navigator.clipboard.writeText(b.dataset.copy);const t=b.textContent;b.textContent='Copied';setTimeout(()=>b.textContent=t,1200)}catch(_){}
+});
+$('#again').addEventListener('click',()=>{
+  LS.set('csa-login',null);ME=null;KEY=null;
+  $('#result').style.display='none';$('#login').style.display='block';$('#fn').value='';$('#l4').value='';$('#cards').innerHTML='';$('#fn').focus();
+});
+const saved=LS.get('csa-login');
+if(saved)signIn(saved.f,saved.l,true).catch(()=>{});
+}
+</script>
+</body>
+</html>
