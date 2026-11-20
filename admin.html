@@ -357,21 +357,38 @@ async function buildFiles(){
   const admin=JSON.stringify({salt:b64e(ASALT),iter:AITER,data:b64e(blob)});
   return {data,admin};
 }
-async function ghPut(gh,path,text){
-  const base=`https://api.github.com/repos/${encodeURIComponent(gh.owner)}/${encodeURIComponent(gh.repo)}/contents/${path}`;
-  const h={Authorization:'Bearer '+gh.token,Accept:'application/vnd.github+json'};
-  const br=gh.branch||'main';
-  const cur=await fetch(`${base}?ref=${encodeURIComponent(br)}`,{headers:h,cache:'no-store'});
-  if(cur.status===401||cur.status===403)throw new Error('GitHub rejected the token. Check it in Settings.');
-  const sha=cur.ok?(await cur.json()).sha:undefined;
-  const r=await fetch(base,{method:'PUT',headers:h,body:JSON.stringify({message:`Update ${path} from organizer page`,content:b64e(enc.encode(text)),sha,branch:br})});
-  if(!r.ok)throw new Error(`GitHub said ${r.status} for ${path}: ${(await r.json().catch(()=>({}))).message||''}`);
+async function ghApi(gh,method,path,body){
+  const ctl=new AbortController(), t=setTimeout(()=>ctl.abort(),30000);
+  try{
+    const r=await fetch(`https://api.github.com/repos/${encodeURIComponent(gh.owner)}/${encodeURIComponent(gh.repo)}/${path}`,
+      {method,signal:ctl.signal,cache:'no-store',headers:{Authorization:'Bearer '+gh.token,Accept:'application/vnd.github+json'},body:body?JSON.stringify(body):undefined});
+    const j=await r.json().catch(()=>({}));
+    if(r.status===401||r.status===403)throw new Error('GitHub rejected the token. Check it in Settings & export (it needs Contents: Read and write on this repo).');
+    if(r.status===404)throw new Error('GitHub couldn\'t find that repo or branch. Check the username, repo and branch in Settings & export.');
+    if(!r.ok){const e=new Error(`GitHub error ${r.status}: ${j.message||''}`);e.status=r.status;throw e}
+    return j;
+  }catch(e){if(e.name==='AbortError')throw new Error("GitHub didn't answer within 30 seconds. Check your connection and press Publish again.");throw e}
+  finally{clearTimeout(t)}
+}
+// one commit for all files -> one Pages build per publish
+async function ghPublish(cfg,files,step){
+  const br=encodeURIComponent(cfg.branch||'main');
+  for(let attempt=0;attempt<2;attempt++){
+    step('1/4');const ref=await ghApi(cfg,'GET',`git/ref/heads/${br}`);
+    const head=ref.object.sha;
+    step('2/4');const base=await ghApi(cfg,'GET',`git/commits/${head}`);
+    step('3/4');const tree=await ghApi(cfg,'POST','git/trees',{base_tree:base.tree.sha,tree:Object.entries(files).map(([path,content])=>({path,mode:'100644',type:'blob',content}))});
+    const commit=await ghApi(cfg,'POST','git/commits',{message:'Update matches from organizer page',tree:tree.sha,parents:[head]});
+    step('4/4');
+    try{await ghApi(cfg,'PATCH',`git/refs/heads/${br}`,{sha:commit.sha,force:false});return}
+    catch(e){if(e.status===422&&attempt===0)continue;throw e}   // someone else pushed in between: redo on top of it
+  }
 }
 $('#publish').addEventListener('click',async()=>{
   const gh=LS.get('csa-gh');
   if(!gh||!gh.owner||!gh.repo||!gh.token){openSettings();toast('Add your GitHub details first, or use Download.');return}
   const b=$('#publish');b.disabled=true;b.textContent='Publishing…';
-  try{const f=await buildFiles();await ghPut(gh,'data.json',f.data);await ghPut(gh,'admin.json',f.admin);
+  try{const f=await buildFiles();await ghPublish(gh,{'data.json':f.data,'admin.json':f.admin},n=>b.textContent=`Publishing… ${n}`);
     dirty=false;hist=[];render();toast('Published. The site updates in about a minute.',6000)}
   catch(err){toast(err.message,8000);b.disabled=false}
   finally{b.textContent='Publish'}
